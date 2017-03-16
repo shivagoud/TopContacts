@@ -24,7 +24,9 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity{
 
     private ContactListAdapter contactsAdapter = new ContactListAdapter();
-    ContactsRankDatabase db = new ContactsRankDatabase();
+    ContactsRankDatabase db;
+
+    final static int CONTACT_COUNT = 20;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,8 +34,30 @@ public class MainActivity extends AppCompatActivity{
         setContentView(R.layout.activity_main);
 
         RecyclerView contactsView = (RecyclerView) findViewById(R.id.contactsListView);
-        contactsView.setLayoutManager(new LinearLayoutManager(this));
+        final LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        contactsView.setLayoutManager(layoutManager);
         contactsView.setAdapter(contactsAdapter);
+
+        contactsView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                int i =layoutManager.findLastCompletelyVisibleItemPosition();
+                int j =layoutManager.findLastVisibleItemPosition();
+                if(i==j)
+                    contactsAdapter.addData(db.loadNextContacts(CONTACT_COUNT));
+            }
+
+            @Override
+            public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+            }
+
+        });
+
+
+        db = ContactsRankDatabase.getInstance(getApplicationContext());
+        contactsAdapter.addData(db.loadNextContacts(CONTACT_COUNT));
 
     }
 
@@ -49,12 +73,11 @@ public class MainActivity extends AppCompatActivity{
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.more:
-                db.init(this);
+                db = ContactsRankDatabase.getInstance(this);
                 Toast.makeText(this,"Loading contact details", Toast.LENGTH_LONG).show();
-                contactsAdapter.addData(db.loadNextContacts(5));
+                contactsAdapter.addData(db.loadNextContacts(CONTACT_COUNT));
                 return true;
             case R.id.refresh:
-                db.init(this);
                 Toast.makeText(this,"Fetching contact list", Toast.LENGTH_LONG).show();
                 loadAllContactsFromSystem();
                 return true;
@@ -65,11 +88,11 @@ public class MainActivity extends AppCompatActivity{
 
     @Override
     protected void onDestroy() {
-        db.closeDatabase();
         super.onDestroy();
     }
 
     void loadAllContactsFromSystem(){
+        db = ContactsRankDatabase.getInstance(this);
         Cursor cur = getContentResolver().query(ContactsContract.Contacts.CONTENT_URI,
                 null, null, null, null);
         if(cur == null)
@@ -85,76 +108,11 @@ public class MainActivity extends AppCompatActivity{
                 contact.fetchContactDetails(this);
 
                 db.addContact(contact);
-                //// TODO: 16-03-2017 Save the details to local database
-                //contactsAdapter.addData(contact);
             }
         }
         cur.close();
-        db.reset();
-        contactsAdapter.addData(db.loadNextContacts(5));
+        contactsAdapter.addData(db.loadFirstContacts(CONTACT_COUNT));
+
     }
-
-
-    private class ContactListAdapter extends RecyclerView.Adapter {
-        ArrayList<Contact> contactsList = new ArrayList<>();
-
-        void clearData(){
-            contactsList.clear();
-        }
-
-        void addData(Contact contact){
-            contactsList.add(contact);
-            notifyItemInserted(contactsList.size()-1);
-        }
-        void addData(List<Contact> contacts){
-            contactsList.addAll(contacts);
-            notifyDataSetChanged();
-        }
-
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.simple_contact, parent, false);
-            return new ContactViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            final ContactViewHolder vh = (ContactViewHolder)holder;
-            final Contact contact = contactsList.get(position);
-            vh.setData(contact.name, contact.number, contact.rank);
-            vh.itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    vh.setRank(++contact.rank);
-                }
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return contactsList.size();
-        }
-    }
-
-    private class ContactViewHolder extends RecyclerView.ViewHolder {
-        private TextView name, number, rank;
-        ContactViewHolder(View view) {
-            super(view);
-            name = (TextView) view.findViewById(R.id.contactNameView);
-            number = (TextView) view.findViewById(R.id.contactNumberView);
-            rank = (TextView) view.findViewById(R.id.contactRankView);
-        }
-
-        void setData(String nm, String no, int r){
-            name.setText(nm);
-            number.setText(no);
-            setRank(r);
-        }
-
-        public void setRank(int r) {
-            rank.setText("Rank: " + r);
-        }
-    }
-
 
 }

@@ -15,8 +15,8 @@ class ContactsRankDatabase {
 
     private Context mContext;
     private ContactsRankDatabaseHelper dbHelper;
-
     private SQLiteDatabase database;
+    private static ContactsRankDatabase instance;
 
     final static String CONTACT_RANK_TABLE="ContactRanks"; // name of table
 
@@ -27,18 +27,19 @@ class ContactsRankDatabase {
 
     private Cursor loadCursor;
 
-    void init(Context context){
-        mContext = context;
+    private ContactsRankDatabase(Context context){
+        mContext = context.getApplicationContext();
         if(dbHelper == null)
             dbHelper = new ContactsRankDatabaseHelper(mContext);
 
-        if(database == null || !database.isOpen())
+        if(database == null)
             database = dbHelper.getWritableDatabase();
     }
 
-    void reset(){
-        if(loadCursor!=null && !loadCursor.isClosed())
-            loadCursor.moveToFirst();
+    public static ContactsRankDatabase getInstance(Context context){
+        if(instance==null)
+            instance = new ContactsRankDatabase(context);
+        return instance;
     }
 
     long addContact(Contact contact) {
@@ -49,21 +50,29 @@ class ContactsRankDatabase {
         return database.replace(CONTACT_RANK_TABLE, null, values);
     }
 
-    private void loadContactsQuery() {
+    ArrayList<Contact> loadFirstContacts(int max) {
         if(loadCursor==null || loadCursor.isClosed()) {
-
             String[] cols = new String[]{CONTACT_ID, CONTACT_NAME, CONTACT_RANK};
             loadCursor = database.query(true, CONTACT_RANK_TABLE, cols, null
-                    , null, null, null, CONTACT_RANK, null);
-            if (loadCursor != null) {
-                loadCursor.moveToFirst();
-            }
+                    , null, null, null, CONTACT_RANK+" DESC", null);
+            if (loadCursor ==null)
+                return new ArrayList<>();
         }
+
+
+        // assert loadCursor!=null;
+
+        loadCursor.moveToFirst();
+        return loadNextContacts(max);
     }
+
 
     ArrayList<Contact> loadNextContacts(int max){
         ArrayList<Contact> contacts = new ArrayList<>();
-        loadContactsQuery();
+
+        if(loadCursor == null)
+            return loadFirstContacts(max);
+
 
         while(max-- > 0 && loadCursor.moveToNext()){
 
@@ -80,9 +89,4 @@ class ContactsRankDatabase {
         return contacts;
     }
 
-    void closeDatabase(){
-        if(loadCursor!=null && !loadCursor.isClosed())
-            loadCursor.close();
-        database.close();
-    }
 }
