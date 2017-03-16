@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity{
     ContactsRankDatabase db;
 
     final static int CONTACT_COUNT = 20;
+    private LinearLayoutManager layoutManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,7 +35,7 @@ public class MainActivity extends AppCompatActivity{
         setContentView(R.layout.activity_main);
 
         RecyclerView contactsView = (RecyclerView) findViewById(R.id.contactsListView);
-        final LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager = new LinearLayoutManager(this);
         contactsView.setLayoutManager(layoutManager);
         contactsView.setAdapter(contactsAdapter);
 
@@ -57,8 +58,22 @@ public class MainActivity extends AppCompatActivity{
 
 
         db = ContactsRankDatabase.getInstance(getApplicationContext());
-        contactsAdapter.addData(db.loadNextContacts(CONTACT_COUNT));
+        int size=CONTACT_COUNT,pos=0;
+        if(savedInstanceState!=null) {
+            size = savedInstanceState.getInt("contacts_size", CONTACT_COUNT);
+            pos = savedInstanceState.getInt("visible_item", 0);
+        }
 
+        contactsAdapter.addData(db.loadFirstContacts(size));
+        layoutManager.scrollToPosition(pos);
+
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt("contacts_size",contactsAdapter.getItemCount());
+        outState.putInt("visible_item",layoutManager.findFirstVisibleItemPosition());
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -72,11 +87,13 @@ public class MainActivity extends AppCompatActivity{
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
+            // load more items to the list
             case R.id.more:
                 db = ContactsRankDatabase.getInstance(this);
                 Toast.makeText(this,"Loading contact details", Toast.LENGTH_LONG).show();
                 contactsAdapter.addData(db.loadNextContacts(CONTACT_COUNT));
                 return true;
+            //fetch from android system
             case R.id.refresh:
                 Toast.makeText(this,"Fetching contact list", Toast.LENGTH_LONG).show();
                 loadAllContactsFromSystem();

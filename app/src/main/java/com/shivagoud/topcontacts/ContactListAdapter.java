@@ -8,6 +8,7 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Created by user on 16-03-2017.
@@ -35,7 +36,7 @@ class ContactListAdapter extends RecyclerView.Adapter {
     }
 
     @Override
-    public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+    public void onBindViewHolder(RecyclerView.ViewHolder holder, final int position) {
         final ContactViewHolder vh = (ContactViewHolder)holder;
         final Contact contact = contactsList.get(position);
         vh.setData(contact.name, contact.number, contact.rank);
@@ -45,6 +46,16 @@ class ContactListAdapter extends RecyclerView.Adapter {
                 vh.setRank(++contact.rank);
                 ContactsRankDatabase db = ContactsRankDatabase.getInstance(v.getContext());
                 db.addContact(contact);
+
+                int newpos=position;
+                while(newpos>0 && contact.rank > contactsList.get(newpos-1).rank){
+                    newpos--;
+                }
+
+                contactsList.remove(contact);
+                contactsList.add(newpos, contact);
+                notifyDataSetChanged();
+
             }
         });
     }
