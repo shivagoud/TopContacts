@@ -19,10 +19,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity{
 
     private ContactListAdapter contactsAdapter = new ContactListAdapter();
+    ContactsRankDatabase db = new ContactsRankDatabase();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,8 +33,8 @@ public class MainActivity extends AppCompatActivity{
 
         RecyclerView contactsView = (RecyclerView) findViewById(R.id.contactsListView);
         contactsView.setLayoutManager(new LinearLayoutManager(this));
-
         contactsView.setAdapter(contactsAdapter);
+
     }
 
     @Override
@@ -46,13 +48,25 @@ public class MainActivity extends AppCompatActivity{
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.refresh:
+            case R.id.more:
+                db.init(this);
                 Toast.makeText(this,"Loading contact details", Toast.LENGTH_LONG).show();
+                contactsAdapter.addData(db.loadNextContacts(5));
+                return true;
+            case R.id.refresh:
+                db.init(this);
+                Toast.makeText(this,"Fetching contact list", Toast.LENGTH_LONG).show();
                 loadAllContactsFromSystem();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        db.closeDatabase();
+        super.onDestroy();
     }
 
     void loadAllContactsFromSystem(){
@@ -62,27 +76,23 @@ public class MainActivity extends AppCompatActivity{
             return;
 
         contactsAdapter.clearData();
-        int i;
-        for (cur.moveToFirst(),i=0; ! cur.isAfterLast() && i<20; cur.moveToNext()) {
+        for (cur.moveToFirst(); ! cur.isAfterLast(); cur.moveToNext()) {
 
             if (cur.getInt(cur.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
                 String id = cur.getString(cur.getColumnIndex(ContactsContract.Contacts._ID));
                 String name = cur.getString(cur.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
                 Contact contact = new Contact(id, name);
-                contact.fetchContactDetails();
+                contact.fetchContactDetails(this);
 
+                db.addContact(contact);
                 //// TODO: 16-03-2017 Save the details to local database
-                contactsAdapter.addData(contact);
-                i++;
+                //contactsAdapter.addData(contact);
             }
         }
         cur.close();
+        db.reset();
+        contactsAdapter.addData(db.loadNextContacts(5));
     }
-
-
-
-
-
 
 
     private class ContactListAdapter extends RecyclerView.Adapter {
@@ -95,6 +105,10 @@ public class MainActivity extends AppCompatActivity{
         void addData(Contact contact){
             contactsList.add(contact);
             notifyItemInserted(contactsList.size()-1);
+        }
+        void addData(List<Contact> contacts){
+            contactsList.addAll(contacts);
+            notifyDataSetChanged();
         }
 
         @Override
@@ -142,32 +156,5 @@ public class MainActivity extends AppCompatActivity{
         }
     }
 
-    private class Contact {
-        String id;
-        String name;
-        String number;
-        int rank;
-        Contact(String id, String name){
-            this.id = id;
-            this.name = name;
-            rank =0;
-        }
 
-        void fetchContactDetails(){
-            Cursor pCur = getContentResolver().query(
-                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                    null,
-                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID +" = ?",
-                    new String[]{id}, null);
-            if(pCur == null)
-                return;
-
-            if(pCur.moveToFirst()) {
-                number = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
-            }
-            pCur.close();
-        }
-
-
-    }
 }
